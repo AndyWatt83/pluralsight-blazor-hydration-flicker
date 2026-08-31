@@ -1,0 +1,31 @@
+@* No @rendermode of its own — it inherits whatever its parent is running as.
+   That's what makes it useful: drop the same component into the static page
+   and into the interactive island, and it reports two different answers.
+
+   Note it reports WHERE separately from WHICH RENDERER. Under Interactive
+   Server both lifecycle runs happen on the server, and saying so out loud is
+   the point — nothing "moves to the browser". *@
+
+<div class="badge @(RendererInfo.IsInteractive ? "badge-interactive" : "badge-static")">
+    <span class="badge-name">@Label</span>
+    <span class="badge-sep">│</span>
+    <span class="badge-k">RendererInfo.Name</span>
+    <span class="badge-v">@RendererInfo.Name</span>
+    <span class="badge-sep">│</span>
+    <span class="badge-k">runs on</span>
+    <span class="badge-v">@Location</span>
+    <span class="badge-sep">│</span>
+    <span class="badge-k">interactive</span>
+    <span class="badge-v">@(RendererInfo.IsInteractive ? "yes" : "no")</span>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = default!;
+
+    // The renderer's name is not a location. Say the location explicitly.
+    private string Location => RendererInfo.Name switch
+    {
+        "WebAssembly" => "your browser",
+        _             => "the server",
+    };
+}

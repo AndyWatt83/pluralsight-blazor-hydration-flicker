@@ -1,0 +1,179 @@
+/* Styling tuned for screen capture: large type, high contrast, and a loading
+   state that is loud enough to read at a glance on a recorded video. */
+
+:root {
+    --ink: #1b1f24;
+    --muted: #5c6773;
+    --line: #d7dde4;
+    --loaded: #2a7d4f;
+    --loaded-bg: #eaf7ef;
+    --loading: #a86a00;
+    --loading-bg: #fff4d9;
+    --static: #6a4fb5;
+    --interactive: #0b62c4;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 3rem 2rem;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: #fbfcfd;
+}
+
+h1 { font-size: 2.4rem; margin: 0 0 .5rem; letter-spacing: -.02em; }
+
+.lede {
+    font-size: 1.15rem;
+    color: var(--muted);
+    max-width: 42rem;
+    margin: 0 0 1.5rem;
+}
+
+.note {
+    max-width: 44rem;
+    margin: .9rem 0 2rem;
+    color: var(--muted);
+    font-size: .98rem;
+}
+
+/* ── Render-mode badge ──────────────────────────────────────────────────── */
+/* Same component in two places. Purple never changes; blue flips. */
+
+.badge {
+    display: flex;
+    align-items: baseline;
+    gap: .55rem;
+    flex-wrap: wrap;
+    padding: .7rem 1.25rem;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .95rem;
+    color: #fff;
+    border-radius: 10px;
+}
+
+.badge-static { background: var(--static); }
+.badge-interactive { background: var(--interactive); }
+
+.badge-name { font-weight: 700; }
+.badge-sep  { opacity: .4; }
+.badge-k    { opacity: .75; }
+.badge-v    { font-weight: 700; }
+
+/* Inside PostCard the badge sits flush on top of the panel it describes. */
+.post-card .badge { border-radius: 10px 10px 0 0; }
+
+/* ── The panel that flickers ────────────────────────────────────────────── */
+/* Fixed min-height so loading and loaded are the same size — the flicker
+   reads as a content swap, not the page jumping around. */
+
+.panel {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    min-height: 190px;
+    padding: 1.5rem 1.75rem;
+    border: 2px solid;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+}
+
+.panel h2 { margin: 0 0 .4rem; font-size: 1.5rem; }
+.panel p  { margin: 0; }
+
+.panel-loaded  { border-color: var(--loaded);  background: var(--loaded-bg); }
+.panel-loading { border-color: var(--loading); background: var(--loading-bg); color: var(--loading); }
+.panel-loading h2 { color: var(--loading); }
+
+.stamp {
+    margin-top: .75rem !important;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .95rem;
+    color: var(--muted);
+}
+
+.spinner {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border: 5px solid rgba(168, 106, 0, .25);
+    border-top-color: var(--loading);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    margin: 1.5rem 0 2.5rem;
+}
+
+.btn {
+    font: inherit;
+    font-size: 1rem;
+    padding: .5rem 1.1rem;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    background: #fff;
+    cursor: pointer;
+}
+
+.btn:hover { background: #f0f3f6; }
+.btn-like  { border-color: #c2185b; color: #c2185b; }
+.btn-reset { border-color: var(--muted); color: var(--muted); }
+
+.hint { font-size: .95rem; color: var(--muted); }
+
+/* ── The trace table ────────────────────────────────────────────────────── */
+
+.trace-heading {
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin: 0 0 .75rem;
+}
+
+.trace-scroll { overflow-x: auto; }
+
+.trace {
+    border-collapse: collapse;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.trace th, .trace td {
+    text-align: left;
+    padding: .5rem 1.75rem .5rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.trace th {
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+}
+
+.verdict {
+    margin-top: 1.5rem;
+    padding: 1rem 1.25rem;
+    border-left: 5px solid #c62828;
+    background: #fdecea;
+    max-width: 44rem;
+}
+
+.verdict p { margin: 0; }
+.verdict-main { font-size: 1.2rem; font-weight: 700; }
+.verdict-sub  { margin-top: .4rem !important; font-size: 1rem; }

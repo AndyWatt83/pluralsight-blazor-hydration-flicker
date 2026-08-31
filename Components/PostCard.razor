@@ -1,0 +1,104 @@
+@* @rendermode InteractiveServer *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+@using FlickerDemo.Services
+@inject SlowApi Api
+@inject NavigationManager Nav
+
+@* This component is the whole demo. It is written the way most people write
+   their first interactive Blazor component — fetch in OnInitializedAsync,
+   show a spinner while you wait. Nothing here is wrong. It just runs twice. *@
+
+<div class="post-card">
+<RenderModeBadge Label="PostCard — opted in" />
+
+@if (_loading)
+{
+    <div class="panel panel-loading">
+        <div class="spinner"></div>
+        <div>
+            <h2>Fetching from the API…</h2>
+            <p>OnInitializedAsync is awaiting. This is the flicker.</p>
+        </div>
+    </div>
+}
+else if (_post is not null)
+{
+    <div class="panel panel-loaded">
+        <h2>@_post.Title</h2>
+        <p>@_post.Body</p>
+        <p class="stamp">fetched at @_post.FetchedAt.ToString("HH:mm:ss.fff")</p>
+    </div>
+}
+
+</div>
+
+<div class="controls">
+    <button class="btn btn-like" @onclick="() => _likes++">♥ Like (@_likes)</button>
+    <button class="btn btn-reset" @onclick="FullReload">↻ Reload and watch again</button>
+    <span class="hint">The Like button only works once interactivity has arrived.</span>
+</div>
+
+<h3 class="trace-heading">Calls this page load made to the API</h3>
+<div class="trace-scroll">
+    <table class="trace">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>RendererInfo.Name</th>
+                <th>Ran on</th>
+                <th>Component instance</th>
+                <th>At</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Api.Trace)
+            {
+                <tr>
+                    <td>@row.Number</td>
+                    <td>@row.Renderer</td>
+                    <td>@(row.Renderer == "WebAssembly" ? "your browser" : "the server")</td>
+                    <td>@row.InstanceId</td>
+                    <td>@row.At.ToString("HH:mm:ss.fff")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (Api.Trace.Count > 1)
+{
+    <div class="verdict">
+        <p class="verdict-main">Two fetches. One page load.</p>
+        <p class="verdict-sub">
+            Both ran <strong>on the server</strong>, in a <strong>different component
+            instance</strong>. Nothing moved to the browser — the prerendered work
+            simply wasn't carried across.
+        </p>
+    </div>
+}
+
+@code {
+    private Post? _post;
+    private bool _loading = true;
+    private int _likes;
+
+    // A fresh Guid per instance. The prerender pass and the interactive pass
+    // are different objects, so these two values never match — which is why
+    // "just hold onto the data" isn't available as a fix.
+    private readonly string _instanceId = Guid.NewGuid().ToString("N")[..6];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Runs once during prerendering, on the server.
+        // Then runs AGAIN when the interactive runtime boots — brand new
+        // component instance, lifecycle from the top, nothing carried over.
+        _loading = true;
+        _post = await Api.GetPostAsync(RendererInfo.Name, RendererInfo.IsInteractive, _instanceId);
+        _loading = false;
+    }
+
+    // A full reload — not an enhanced navigation. Internal navigations don't
+    // prerender, so only a real page load reproduces the handoff.
+    private void FullReload() => Nav.Refresh(forceReload: true);
+}

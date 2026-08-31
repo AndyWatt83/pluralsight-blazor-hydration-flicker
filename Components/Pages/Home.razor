@@ -1,0 +1,24 @@
+@page "/"
+
+@* No @rendermode. This page is static SSR and stays that way for its whole
+   life — that's the default, not a choice I had to make. Exactly one component
+   below opts into interactivity, so the boundary sits in one findable place. *@
+
+<PageTitle>The flicker</PageTitle>
+
+<h1>Watch the data arrive twice</h1>
+
+<p class="lede">
+    Reload the page and keep your eyes on the panel below. The content appears,
+    disappears, and comes back.
+</p>
+
+<RenderModeBadge Label="This page — never opted in" />
+
+<p class="note">
+    Same badge component, two places. The one above is in the static page and
+    never changes. The one below is inside the component that asked for
+    interactivity — watch it flip.
+</p>
+
+<PostCard />
