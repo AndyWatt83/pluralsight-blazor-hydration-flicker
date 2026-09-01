@@ -17,10 +17,20 @@
     <span class="badge-sep">│</span>
     <span class="badge-k">interactive</span>
     <span class="badge-v">@(RendererInfo.IsInteractive ? "yes" : "no")</span>
+    @if (Instance is not null)
+    {
+        <span class="badge-sep">│</span>
+        <span class="badge-k">instance</span>
+        <span class="badge-v">@Instance</span>
+    }
 </div>
 
 @code {
     [Parameter] public string Label { get; set; } = default!;
+
+    /// Optional. When shown, it changes in front of the viewer at the handoff —
+    /// proof that the second run is a different object, even when the data survives.
+    [Parameter] public string? Instance { get; set; }
 
     // The renderer's name is not a location. Say the location explicitly.
     private string Location => RendererInfo.Name switch

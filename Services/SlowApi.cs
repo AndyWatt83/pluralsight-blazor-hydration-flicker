@@ -3,10 +3,10 @@ namespace FlickerDemo.Services;
 /// <summary>
 /// Stands in for "the API".
 ///
-/// Two things make it useful on camera. It is deliberately slow, so the second
+/// Two things make it useful on camera. It is deliberately slow, so a second
 /// fetch is impossible to miss. And it records every call it receives, so the
-/// page can show — as a fact, not a claim — that the same data was fetched
-/// twice for a single page load.
+/// page can show — as a fact, not a claim — how many times the data was
+/// actually fetched for a single page load.
 /// </summary>
 public class SlowApi
 {
@@ -30,11 +30,11 @@ public class SlowApi
     /// component instance it is, so the trace can answer the two questions the
     /// clip is really about: where did this run, and was it the same object?
     /// </summary>
-    public async Task<Post> GetPostAsync(string renderer, bool isInteractive, string instanceId)
+    public async Task<BlogPost> GetPostAsync(string renderer, bool isInteractive, string instanceId)
     {
         await Task.Delay(Latency);
 
-        var post = new Post(
+        var post = new BlogPost(
             "The server already fetched this",
             "This text was fetched on the server and written into the HTML your "
                 + "browser first received. Watch the badge above to see what happens next.",
@@ -47,6 +47,10 @@ public class SlowApi
             // exactly one page load's calls — no drift between takes, and no
             // stray request inflating the count mid-recording.
             if (!isInteractive) _trace.Clear();
+            // With prerendering disabled there is no prerender call to reset
+            // the trace, so use the other signal a new page load gives us: an
+            // interactive fetch that doesn't follow a prerender fetch.
+            else if (_trace.Count == 0 || _trace[^1].IsInteractive) _trace.Clear();
 
             _trace.Add(new FetchRecord(
                 _trace.Count + 1, renderer, isInteractive, instanceId, post.FetchedAt));
@@ -54,9 +58,31 @@ public class SlowApi
 
         return post;
     }
+
+    /// <summary>
+    /// Called by the interactive run when it DIDN'T need to fetch, so the trace
+    /// can show the restore as an event rather than as an absence.
+    /// </summary>
+    public void RecordRestore(string renderer, string instanceId, DateTime originalFetchTime)
+    {
+        lock (_gate)
+        {
+            _trace.Add(new FetchRecord(
+                _trace.Count + 1, renderer, true, instanceId, originalFetchTime, Restored: true));
+        }
+    }
 }
 
-public record Post(string Title, string Body, DateTime FetchedAt);
+/// <summary>
+/// The payload. Must be serializable — [PersistentState] round-trips it through
+/// System.Text.Json by default.
+/// </summary>
+public record BlogPost(string Title, string Body, DateTime FetchedAt);
 
 public record FetchRecord(
-    int Number, string Renderer, bool IsInteractive, string InstanceId, DateTime At);
+    int Number,
+    string Renderer,
+    bool IsInteractive,
+    string InstanceId,
+    DateTime At,
+    bool Restored = false);

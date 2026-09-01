@@ -177,3 +177,10 @@ h1 { font-size: 2.4rem; margin: 0 0 .5rem; letter-spacing: -.02em; }
 .verdict p { margin: 0; }
 .verdict-main { font-size: 1.2rem; font-weight: 700; }
 .verdict-sub  { margin-top: .4rem !important; font-size: 1rem; }
+
+.verdict-bad  { border-left-color: #c62828; background: #fdecea; }
+.verdict-good { border-left-color: var(--loaded); background: var(--loaded-bg); }
+
+.row-restored { color: var(--loaded); font-weight: 700; }
+
+.verdict-warn { border-left-color: var(--loading); background: var(--loading-bg); }

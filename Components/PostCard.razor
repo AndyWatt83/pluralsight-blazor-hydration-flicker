@@ -1,16 +1,22 @@
-@* @rendermode InteractiveServer *@
+@rendermode InteractiveServer
+@* DEMO STEP 2 — the wrong fix. Swap the line above for this one:
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+*@
 
 @using FlickerDemo.Services
 @inject SlowApi Api
 @inject NavigationManager Nav
 
-@* This component is the whole demo. It is written the way most people write
-   their first interactive Blazor component — fetch in OnInitializedAsync,
-   show a spinner while you wait. Nothing here is wrong. It just runs twice. *@
+@* This component is written the way most people write their first interactive
+   Blazor component — fetch in OnInitializedAsync, show a spinner while you
+   wait. Nothing here is wrong. It just runs twice.
+
+   The whole demo is driven by two comment toggles:
+     step 2: swap the @rendermode lines above   (the wrong fix)
+     step 3: uncomment [PersistentState] below  (the right fix)          *@
 
 <div class="post-card">
-<RenderModeBadge Label="PostCard — opted in" />
+<RenderModeBadge Label="PostCard — opted in" Instance="@_instanceId" />
 
 @if (_loading)
 {
@@ -18,16 +24,16 @@
         <div class="spinner"></div>
         <div>
             <h2>Fetching from the API…</h2>
-            <p>OnInitializedAsync is awaiting. This is the flicker.</p>
+            <p>OnInitializedAsync is awaiting.</p>
         </div>
     </div>
 }
-else if (_post is not null)
+else if (Post is not null)
 {
     <div class="panel panel-loaded">
-        <h2>@_post.Title</h2>
-        <p>@_post.Body</p>
-        <p class="stamp">fetched at @_post.FetchedAt.ToString("HH:mm:ss.fff")</p>
+        <h2>@Post.Title</h2>
+        <p>@Post.Body</p>
+        <p class="stamp">fetched at @Post.FetchedAt.ToString("HH:mm:ss.fff")</p>
     </div>
 }
 
@@ -39,7 +45,7 @@ else if (_post is not null)
     <span class="hint">The Like button only works once interactivity has arrived.</span>
 </div>
 
-<h3 class="trace-heading">Calls this page load made to the API</h3>
+<h3 class="trace-heading">What this page load did about its data</h3>
 <div class="trace-scroll">
     <table class="trace">
         <thead>
@@ -48,17 +54,19 @@ else if (_post is not null)
                 <th>RendererInfo.Name</th>
                 <th>Ran on</th>
                 <th>Component instance</th>
-                <th>At</th>
+                <th>Action</th>
+                <th>Data timestamp</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var row in Api.Trace)
             {
-                <tr>
+                <tr class="@(row.Restored ? "row-restored" : null)">
                     <td>@row.Number</td>
                     <td>@row.Renderer</td>
                     <td>@(row.Renderer == "WebAssembly" ? "your browser" : "the server")</td>
                     <td>@row.InstanceId</td>
+                    <td>@(row.Restored ? "restored from payload" : "FETCHED from API")</td>
                     <td>@row.At.ToString("HH:mm:ss.fff")</td>
                 </tr>
             }
@@ -66,9 +74,11 @@ else if (_post is not null)
     </table>
 </div>
 
-@if (Api.Trace.Count > 1)
+@* The verdict reads the trace, so it follows the demo on its own:
+   red for the problem, amber for the wrong fix, green for the right one. *@
+@if (_fetchCount > 1)
 {
-    <div class="verdict">
+    <div class="verdict verdict-bad">
         <p class="verdict-main">Two fetches. One page load.</p>
         <p class="verdict-sub">
             Both ran <strong>on the server</strong>, in a <strong>different component
@@ -77,24 +87,59 @@ else if (_post is not null)
         </p>
     </div>
 }
+else if (RendererInfo.IsInteractive && _restored)
+{
+    <div class="verdict verdict-good">
+        <p class="verdict-main">One fetch. One page load.</p>
+        <p class="verdict-sub">
+            The instance still changed — look at the badge. But the data crossed
+            the boundary in the page itself, so the new instance had nothing left
+            to do. Same timestamp, no second call, no flicker.
+        </p>
+    </div>
+}
+else if (RendererInfo.IsInteractive && !_loading && !_prerendered)
+{
+    <div class="verdict verdict-warn">
+        <p class="verdict-main">One fetch — but nothing was prerendered.</p>
+        <p class="verdict-sub">
+            View-source this page: the content isn't in the HTML. The duplication
+            went away because the server render was <strong>deleted</strong>, not
+            because its work was kept. Slower first paint, nothing for crawlers.
+        </p>
+    </div>
+}
 
 @code {
-    private Post? _post;
-    private bool _loading = true;
+    // DEMO STEP 3 — the fix. Uncomment the attribute:
+    // [PersistentState]
+    public BlogPost? Post { get; set; }
+
+    private bool _loading;
     private int _likes;
 
     // A fresh Guid per instance. The prerender pass and the interactive pass
-    // are different objects, so these two values never match — which is why
-    // "just hold onto the data" isn't available as a fix.
+    // are different objects — which is why the fix has to serialize the data
+    // rather than "hold onto" it.
     private readonly string _instanceId = Guid.NewGuid().ToString("N")[..6];
+
+    private int _fetchCount => Api.Trace.Count(r => !r.Restored);
+    private bool _restored => Api.Trace.Any(r => r.Restored);
+    private bool _prerendered => Api.Trace.Any(r => !r.IsInteractive);
 
     protected override async Task OnInitializedAsync()
     {
-        // Runs once during prerendering, on the server.
-        // Then runs AGAIN when the interactive runtime boots — brand new
-        // component instance, lifecycle from the top, nothing carried over.
+        // This guard is in the code from the start, and it is INERT until
+        // step 3: nothing sets Post before initialization unless the framework
+        // restores it from the persisted payload. The attribute is the switch.
+        if (Post is not null)
+        {
+            Api.RecordRestore(RendererInfo.Name, _instanceId, Post.FetchedAt);
+            return;
+        }
+
         _loading = true;
-        _post = await Api.GetPostAsync(RendererInfo.Name, RendererInfo.IsInteractive, _instanceId);
+        Post = await Api.GetPostAsync(RendererInfo.Name, RendererInfo.IsInteractive, _instanceId);
         _loading = false;
     }
 

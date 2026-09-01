@@ -1,10 +1,11 @@
-# The flicker — M1C1 demo
+# The flicker — Module 1 demo
 
-A deliberately tiny Blazor Web App whose only job is to make the prerender →
-interactive handoff visible on camera, for **M1C1** of *Data Hydration & State
-Persistence in ASP.NET Core 10 Blazor*.
+A deliberately tiny Blazor Web App that makes the prerender → interactive
+handoff visible on camera, for *Data Hydration & State Persistence in ASP.NET
+Core 10 Blazor*.
 
-One page. One component that opts into interactivity. No fix — the fix is M2.
+One static page, one component that opts into interactivity, and three states
+you flip between with **comment toggles** — nothing is typed or deleted on camera.
 
 ```bash
 dotnet run     # http://localhost:5199
@@ -12,95 +13,124 @@ dotnet run     # http://localhost:5199
 
 Verified on SDK **10.0.400** / ASP.NET Core runtime **10.0.11**.
 
-## The one-glance story
+## The demo: three states, two comment toggles
+
+All three states live in [`Components/PostCard.razor`](Components/PostCard.razor)
+permanently. Nothing is added or deleted on camera — you only flip comments,
+and the verdict panel recognises each state on its own (red / amber / green).
+
+The `if (Post is not null) return;` guard is in the code from the start and is
+**inert** until step 3: nothing sets `Post` before initialization unless the
+framework restores it. The attribute is the switch, which keeps the diff between
+"broken" and "fixed" honest — one line.
+
+### State 1 — the flicker (the repo's resting state)
+
+Run as-is.
+
+```
+#   RENDERER   RAN ON       INSTANCE   ACTION             DATA TIMESTAMP
+1   Static     the server   4ba18b     FETCHED from API   10:45:45.776
+2   Server     the server   5948ac     FETCHED from API   10:45:47.585
+```
+
+Two fetches, two instances, **two timestamps**. Content → spinner → content.
+Red verdict.
+
+### State 2 — the wrong fix (toggle the `@rendermode` lines)
+
+Comment line 1, uncomment the `prerender: false` line below it:
+
+```razor
+@* @rendermode InteractiveServer *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+```
+
+```
+1   Server     the server   582ac0     FETCHED from API   10:46:29.464
+```
+
+One fetch — and an amber verdict, because **nothing was prerendered**: curl the
+page and the content isn't in the HTML. The duplication went away because the
+server render was deleted, not because its work was kept. Right answer to "this
+component can't render on the server"; wrong answer to "my data is fetched
+twice."
+
+### State 3 — the fix (revert the toggle, uncomment the attribute)
+
+```razor
+@rendermode InteractiveServer
+```
+```csharp
+[PersistentState]
+public BlogPost? Post { get; set; }
+```
+
+```
+1   Static     the server   0604fc     FETCHED from API        10:47:19.649
+2   Server     the server   a2e8ea     restored from payload   10:47:19.649
+```
+
+**The instance still changed. The timestamp did not.** The second run is still a
+brand-new object — serialization is required precisely *because* there's no live
+reference to hold onto — but the data came across inside the page, so there was
+nothing left to do. Green verdict, and the payload is visible in view-source:
+`<!--Blazor-Server-Component-State:CfDJ8...-->` (`CfDJ8` = Data Protection —
+encrypted under Interactive Server, unlike WebAssembly's readable base64).
+
+Hot reload note: a `@rendermode` change is a structural edit — restart the app
+between states rather than relying on hot reload. `dotnet watch` will prompt.
+
+## The badge
 
 The page carries the **same badge component twice**. It has no render mode of
-its own, so it inherits whatever its parent is running as:
+its own, so it inherits its parent's:
 
 ```
 This page — never opted in   │ RendererInfo.Name Static │ runs on the server │ interactive no
-PostCard   — opted in        │ RendererInfo.Name Server │ runs on the server │ interactive yes
+PostCard   — opted in        │ RendererInfo.Name Server │ runs on the server │ interactive yes │ instance c036c9
 ```
 
-The purple one never changes. The blue one starts `Static / no` and flips to
-`Server / yes` in front of the viewer. That's SSR-first shown rather than
-asserted: static is the default, and interactivity is one deliberate opt-in in
+The purple one never changes. The blue one flips in front of the viewer — and
+its instance id changes with it, even in state 3. That's SSR-first shown rather
+than asserted: static is the default, interactivity is one deliberate opt-in in
 one findable place.
 
-**Note the third column is identical in both.** That is the most important thing
-on the page.
-
-## Where code runs vs. which renderer
-
-The badge and the trace table state the renderer name and the **location**
-separately, on purpose.
-
-`RendererInfo.Name` returns `Static`, then `Server`. Neither of those is a
-*place*. Under Interactive Server **both lifecycle runs happen on the server** —
-nothing moves to the browser. A learner arriving with React/Next hydration
-instincts will assume the flicker is caused by execution relocating client-side,
-and that assumption is wrong here. The demo closes that door by saying "runs on:
-the server" twice.
-
-Under `InteractiveWebAssembly` the second row would read `WebAssembly / your
-browser`; under `InteractiveAuto` it's Server on the first visit and WebAssembly
-after that. Same boundary, same lost work, three different answers to "where".
-(The badge already handles all three — only the Server path is exercised here.)
-
-## What the trace proves
-
-```
-#   RENDERERINFO.NAME   RAN ON       COMPONENT INSTANCE   AT
-1   Static              the server   fc16ce               17:01:33.247
-2   Server              the server   8457ef               17:01:34.876
-```
-
-Two fetches, one page load, **two different component instances**. The instance
-column is why "just hold onto the data" isn't available as a fix: the second run
-isn't the same object waking up, it's a new one starting from scratch. That sets
-up M2 — the state has to be *serialized* across, because there's no live
-reference to carry.
-
-## The beat sheet
-
-1. **Land on the page.** Content is already there — the server fetched it and
-   rendered it into the HTML. Blue badge reads `Static / no`.
-2. **~1.5s later the panel goes amber.** Content gone, spinner in its place,
-   badge flips to `Server / yes`. This is the moment the clip exists for.
-3. **Content returns** — identical text, *different* timestamp.
-4. **Point at the trace.** Two rows, two instances, both on the server.
-5. **Click Like** to show interactivity has genuinely arrived, then **Reload and
-   watch again**.
+**The "runs on" column is identical in both.** Under Interactive Server *both*
+lifecycle runs happen on the server; nothing moves to the browser. A learner
+arriving with React/Next hydration instincts will assume the flicker is
+execution relocating client-side, and that's wrong here. Under
+`InteractiveWebAssembly` row 2 would read `WebAssembly / your browser`; under
+`InteractiveAuto` it's Server first visit, WebAssembly after. The badge handles
+all three — only the Server path is exercised here.
 
 ## Recording notes
 
 - **Use the Reload button, not enhanced navigation.** Internal Blazor
   navigations don't prerender, so only a full page load reproduces the handoff.
   The button calls `Nav.Refresh(forceReload: true)` for exactly that reason.
-- **The panel is a fixed 190px.** Loading and loaded states are the same height,
-  so the flicker reads as a clean content swap, not the page jumping.
+- **The panel is a fixed 190px**, so loading and loaded are the same height and
+  the flicker reads as a content swap rather than the page jumping.
 - **Dial the latency** in [`Services/SlowApi.cs`](Services/SlowApi.cs) →
-  `Latency`. 1500ms is set for narrating over; ~400ms shows how easily this
-  hides on a fast connection — a good beat for "invisible in dev, obvious in
-  prod".
-- **The trace self-resets.** Any prerender clears it, so the table always shows
-  exactly one page load. No stale rows between takes. (Assumes one presenter;
+  `Latency`. 1500ms narrates comfortably; ~400ms shows how easily this hides on
+  a fast connection — a good beat for "invisible in dev, obvious in prod".
+- **The trace self-resets** on every prerender, so the table always reflects
+  exactly one page load. No stale rows between takes. (One presenter assumed;
   two browsers at once will interleave.)
-- **`ReconnectModal` has been deleted** from the template. Circuit reconnection
-  is deferred to *Advanced Blazor Rendering, State, and Resilience Patterns*, and
-  a "Rejoining the server…" dialog appearing mid-take would put an out-of-scope
-  topic on camera.
-- **Nothing here is written badly.** Fetch in `OnInitializedAsync`, spinner while
-  you wait — that's the idiomatic first component. Worth saying out loud: this
-  isn't a mistake anyone made, it's the default.
+- **`ReconnectModal` is deleted** from the template — circuit reconnection is
+  deferred to the later resilience course and shouldn't appear on camera here.
+- **The verdict panel is adaptive**: red for >1 fetch, green for 1 fetch once
+  interactive. Flipping between states needs no other edits.
+- **Nothing in state 1 is written badly.** Fetch in `OnInitializedAsync`,
+  spinner while you wait — that's the idiomatic first component. Worth saying
+  out loud: it isn't a mistake anyone made, it's the default.
 
 ## A note on the word "hydration"
 
 Worth knowing before you say it on camera. "Hydration" is a real, decade-old
 term — from the **JavaScript SPA world** (React ships `hydrateRoot()`), where it
 means the client reconstructing component state and attaching handlers to
-server-rendered HTML that's already in the DOM. Nobody at Pluralsight invented
-it.
+server-rendered HTML already in the DOM. Nobody at Pluralsight invented it.
 
 But it is **not Microsoft's Blazor vocabulary**. Checked on 10.0.11:
 
@@ -116,8 +146,7 @@ eviction, which this course explicitly defers.
 
 Microsoft's verbs are **persist → restore**: *"Persist prerendered state"*, *"the
 state is restored when the component renders interactively"*. They do use
-**"flicker"**, twice, unprompted — so the demo's framing is on-vocabulary even
-where the course title isn't.
+**"flicker"**, twice, unprompted.
 
 Two practical consequences:
 
@@ -125,6 +154,6 @@ Two practical consequences:
    topic**. The page they need is *"ASP.NET Core Blazor prerendered state
    persistence"*. Worth saying that mapping out loud, once.
 2. In React/Next the data half is normally carried across **for you**. In Blazor
-   it is not — you opt in per property with `[PersistentState]`. So the borrowed
+   it is not — you opt in per property with `[PersistentState]`. The borrowed
    term quietly predicts the wrong behaviour, and that expectation gap *is* the
-   double fetch. Used deliberately, that's the best hook in the module.
+   double fetch.
