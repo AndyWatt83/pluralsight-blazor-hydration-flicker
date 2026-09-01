@@ -14,7 +14,17 @@
 
 <body>
     <Routes />
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    @* Recording aid: autostart="false" holds the page in its genuinely static,
+       prerendered state until Blazor.start() runs. On localhost the runtime
+       boots almost instantly, so without this the viewer barely sees the good
+       content before the flicker replaces it. This is also what a slow
+       connection does for real: the HTML is readable while blazor.web.js is
+       still downloading. Set the delay to 0 to restore normal behaviour. *@
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script>
+        const HANDOFF_DELAY_MS = 2500;
+        setTimeout(() => Blazor.start(), HANDOFF_DELAY_MS);
+    </script>
 </body>
 
 </html>

@@ -30,12 +30,12 @@ h1 { font-size: 2.4rem; margin: 0 0 .5rem; letter-spacing: -.02em; }
 .lede {
     font-size: 1.15rem;
     color: var(--muted);
-    max-width: 42rem;
+    max-width: 82rem;
     margin: 0 0 1.5rem;
 }
 
 .note {
-    max-width: 44rem;
+    max-width: 100rem;
     margin: .9rem 0 2rem;
     color: var(--muted);
     font-size: .98rem;

@@ -1,7 +1,6 @@
 @rendermode InteractiveServer
-@* DEMO STEP 2 — the wrong fix. Swap the line above for this one:
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
-*@
+
+@* @rendermode @(new InteractiveServerRenderMode(prerender: false)) *@
 
 @using FlickerDemo.Services
 @inject SlowApi Api
@@ -112,7 +111,7 @@ else if (RendererInfo.IsInteractive && !_loading && !_prerendered)
 
 @code {
     // DEMO STEP 3 — the fix. Uncomment the attribute:
-    // [PersistentState]
+    [PersistentState]
     public BlogPost? Post { get; set; }
 
     private bool _loading;
